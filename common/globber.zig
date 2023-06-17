@@ -165,8 +165,8 @@ pub fn order(a: []const u8, b: []const u8) std.math.Order {
         return .lt;
     }
 
-    const count_a = @as(u2, @boolToInt(a[0] == '*')) + @boolToInt(a[a.len - 1] == '*');
-    const count_b = @as(u2, @boolToInt(b[0] == '*')) + @boolToInt(b[b.len - 1] == '*');
+    const count_a = @as(u2, @intFromBool(a[0] == '*')) + @intFromBool(a[a.len - 1] == '*');
+    const count_b = @as(u2, @intFromBool(b[0] == '*')) + @intFromBool(b[b.len - 1] == '*');
 
     if (count_a == 0 and count_b == 0) {
         return .eq;
@@ -206,7 +206,7 @@ test order {
         "a",
     };
 
-    for (descending) |a, i| {
+    for (descending, 0..) |a, i| {
         for (descending[i..]) |b| {
             try testing.expect(order(a, b) != .lt);
         }
@@ -215,7 +215,7 @@ test order {
     var ascending = descending;
     mem.reverse([]const u8, &ascending);
 
-    for (ascending) |a, i| {
+    for (ascending, 0..) |a, i| {
         for (ascending[i..]) |b| {
             try testing.expect(order(a, b) != .gt);
         }
