@@ -109,16 +109,16 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
         const wlr_output = server.root.output_layout.adjacentOutput(
             direction,
             seat.focused_output.?.wlr_output,
-            @intToFloat(f64, focus_box.x + @divTrunc(focus_box.width, 2)),
-            @intToFloat(f64, focus_box.y + @divTrunc(focus_box.height, 2)),
+            @floatFromInt(focus_box.x + @divTrunc(focus_box.width, 2)),
+            @floatFromInt(focus_box.y + @divTrunc(focus_box.height, 2)),
         ) orelse return null;
-        return @intToPtr(*Output, wlr_output.data);
+        return @as(*Output, @ptrFromInt(wlr_output.data));
     } else {
         // Check if an output matches by name
-        var it = server.root.active_outputs.iterator(.forward);
-        while (it.next()) |output| {
-            if (mem.eql(u8, mem.span(output.wlr_output.name), str)) {
-                return output;
+        var it = server.root.outputs.first;
+        while (it) |node| : (it = node.next) {
+            if (mem.eql(u8, mem.sliceTo(node.data.wlr_output.name, 0), str)) {
+                return &node.data;
             }
         }
         return Error.InvalidOutputIndicator;
