@@ -15,10 +15,13 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const fmt = std.fmt;
+
 const assert = std.debug.assert;
 const wlr = @import("wlroots");
 
 const server = &@import("../main.zig").server;
+const util = @import("../util.zig");
 
 const Direction = @import("../command.zig").Direction;
 const Error = @import("../command.zig").Error;
@@ -42,6 +45,23 @@ pub fn focusView(
         seat.focus(target);
         server.root.applyPending();
     }
+}
+
+pub fn listViews(
+    _: *Seat,
+    _: []const [:0]const u8,
+    out: *?[]const u8,
+) Error!void {
+    var it = server.root.views.iterator(.forward);
+    var buffer = std.ArrayList(u8).init(util.gpa);
+    const writer = buffer.writer();
+
+    while (it.next()) |view| {
+        if (view.getAppId()) |app_id| {
+            try writer.print("{s}\n", .{app_id});
+        }
+    }
+    out.* = try buffer.toOwnedSlice();
 }
 
 /// Swap the currently focused view with either the view higher or lower in the visible stack
