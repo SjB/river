@@ -57,8 +57,8 @@ pub fn listViews(
     const writer = buffer.writer();
 
     while (it.next()) |view| {
-        if (view.getAppId()) |app_id| {
-            try writer.print("{s}\n", .{app_id});
+        if (view.getTitle()) |title| {
+            try writer.print("{s}\n", .{title});
         }
     }
     out.* = try buffer.toOwnedSlice();
