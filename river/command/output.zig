@@ -29,6 +29,8 @@ const Error = @import("../command.zig").Error;
 const Output = @import("../Output.zig");
 const Seat = @import("../Seat.zig");
 
+const log = std.log.scoped(.layout);
+
 pub fn focusOutput(
     seat: *Seat,
     args: []const [:0]const u8,
@@ -115,10 +117,11 @@ fn getOutput(seat: *Seat, str: []const u8) !?*Output {
         return @as(*Output, @ptrFromInt(wlr_output.data));
     } else {
         // Check if an output matches by name
-        var it = server.root.outputs.first;
-        while (it) |node| : (it = node.next) {
-            if (mem.eql(u8, mem.sliceTo(node.data.wlr_output.name, 0), str)) {
-                return &node.data;
+        var it = server.root.active_outputs.iterator(.forward);
+        while (it.next()) |output| {
+            log.warn("output name {s} == {s}", .{ str, output.wlr_output.name });
+            if (mem.eql(u8, mem.sliceTo(output.wlr_output.name, 0), str)) {
+                return output;
             }
         }
         return Error.InvalidOutputIndicator;

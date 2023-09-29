@@ -950,7 +950,7 @@ fn updateFocusFollowsCursorTarget(self: *Self) void {
                 {
                     self.seat.focusOutput(view.current.output.?);
                     self.seat.focus(view);
-                    self.last_focus_follows_cursor_target = view;
+                    self.focus_follows_cursor_target = view;
                     server.root.applyPending();
                 }
             },
