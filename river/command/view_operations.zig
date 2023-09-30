@@ -86,6 +86,21 @@ pub fn fetchView(
     }
 }
 
+pub fn listViewsDump(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!void {
+    var it = server.root.views.iterator(.forward);
+    var buffer = std.ArrayList(u8).init(util.gpa);
+    const writer = buffer.writer();
+
+    while (it.next()) |view| {
+        const tags = view.current.tags;
+        const appid = mem.sliceTo(view.getAppId(), 0) orelse "";
+        const title = mem.sliceTo(view.getTitle(), 0) orelse "";
+
+        try writer.print("{s:20} {d:4} {s}\n", .{ appid, tags, title });
+    }
+    out.* = try buffer.toOwnedSlice();
+}
+
 pub fn listViews(
     _: *Seat,
     _: []const [:0]const u8,
