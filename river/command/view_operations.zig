@@ -111,7 +111,10 @@ pub fn listViews(
     const writer = buffer.writer();
 
     while (it.next()) |view| {
-        if (view.getTitle()) |title| {
+        const appid = mem.sliceTo(view.getAppId(), 0) orelse "";
+        const title = mem.sliceTo(view.getTitle(), 0) orelse "";
+
+        if (appid.len != 0) {
             try writer.print("{s}\n", .{title});
         }
     }
