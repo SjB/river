@@ -15,15 +15,10 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const fmt = std.fmt;
-const mem = std.mem;
-
-const globber = @import("globber");
 const assert = std.debug.assert;
 const wlr = @import("wlroots");
 
 const server = &@import("../main.zig").server;
-const util = @import("../util.zig");
 
 const Direction = @import("../command.zig").Direction;
 const Error = @import("../command.zig").Error;
@@ -47,78 +42,6 @@ pub fn focusView(
         seat.focus(target);
         server.root.applyPending();
     }
-}
-
-pub fn fetchView(
-    seat: *Seat,
-    args: []const [:0]const u8,
-    _: *?[]const u8,
-) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
-
-    // If the fallback pseudo-output is focused, there is nowhere to send the view
-    if (seat.focused_output == null) {
-        assert(server.root.active_outputs.empty());
-        return;
-    }
-
-    if (args[1].len == 0) return;
-
-    const output = seat.focused_output orelse return;
-
-    var it = server.root.views.iterator(.forward);
-
-    while (it.next()) |view| {
-        const title = mem.sliceTo(view.getTitle(), 0) orelse "";
-        if (globber.match(title, args[1])) {
-            const new_tags = view.pending.tags | output.pending.tags;
-            if (new_tags != 0) {
-                view.pending.tags = new_tags;
-            }
-            if (output != view.current.output) {
-                view.setPendingOutput(output);
-            }
-            seat.focus(view);
-            server.root.applyPending();
-            break;
-        }
-    }
-}
-
-pub fn listViewsDump(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!void {
-    var it = server.root.views.iterator(.forward);
-    var buffer = std.ArrayList(u8).init(util.gpa);
-    const writer = buffer.writer();
-
-    while (it.next()) |view| {
-        const tags = view.current.tags;
-        const appid = mem.sliceTo(view.getAppId(), 0) orelse "";
-        const title = mem.sliceTo(view.getTitle(), 0) orelse "";
-
-        try writer.print("{s:20} {d:4} {s}\n", .{ appid, tags, title });
-    }
-    out.* = try buffer.toOwnedSlice();
-}
-
-pub fn listViews(
-    _: *Seat,
-    _: []const [:0]const u8,
-    out: *?[]const u8,
-) Error!void {
-    var it = server.root.views.iterator(.forward);
-    var buffer = std.ArrayList(u8).init(util.gpa);
-    const writer = buffer.writer();
-
-    while (it.next()) |view| {
-        const appid = mem.sliceTo(view.getAppId(), 0) orelse "";
-        const title = mem.sliceTo(view.getTitle(), 0) orelse "";
-
-        if (appid.len != 0) {
-            try writer.print("{s}\n", .{title});
-        }
-    }
-    out.* = try buffer.toOwnedSlice();
 }
 
 /// Swap the currently focused view with either the view higher or lower in the visible stack
