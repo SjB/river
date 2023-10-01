@@ -24,7 +24,7 @@ const util = @import("../util.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
-pub fn fetchView(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
+pub fn focusViewByTitle(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
     if (args.len < 2) return Error.NotEnoughArguments;
     if (args.len > 2) return Error.TooManyArguments;
 
