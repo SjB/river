@@ -137,17 +137,17 @@ pub fn fetchViewById(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) E
 }
 
 pub fn listViews(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!void {
-    var list = std.ArrayList(struct { id: []const u8, @"app-id": []const u8, title: []const u8, output: u8, tags: u32 }).init(util.gpa);
+    var list = std.ArrayList(struct { id: []const u8, @"app-id": []const u8, title: []const u8, output: []const u8, tags: u32 }).init(util.gpa);
+
     var it = server.root.views.iterator(.forward);
     while (it.next()) |view| {
         // we only want to know about the view that have and output
-        if (view.current.output == null) continue;
-
         const title = std.mem.span(view.getTitle()) orelse "";
         const appId = std.mem.span(view.getAppId()) orelse "";
-        const output: u8 = if (view.current.output == null) ' ' else '+';
+
+        var name = if (view.current.output) |output| std.mem.span(output.wlr_output.name) else "";
         const tags = view.current.tags;
-        try list.append(.{ .id = view.id, .@"app-id" = appId, .title = title, .output = output, .tags = tags });
+        try list.append(.{ .id = view.id, .@"app-id" = appId, .title = title, .output = name, .tags = tags });
     }
 
     var buffer = std.ArrayList(u8).init(util.gpa);
