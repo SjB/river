@@ -12,6 +12,9 @@ _riverctl_subcommands()
         'exit:Exit the compositor, terminating the Wayland session'
         'focus-output:Focus the next or previous output'
         'focus-view:Focus the next or previous view in the stack'
+        'focus-view-by:Focus the view selected by the search term'
+        'fetch-view-by:Fetch the view selected by the search term'
+        'list-views: list all the view with some information'
         'move:Move the focused view in the specified direction'
         'resize:Resize the focused view along the given axis'
         'snap:Snap the focused view to the specified screen edge'
@@ -171,6 +174,8 @@ _riverctl()
             case "$words[1]" in
                 focus-output) _alternative 'arguments:args:(next previous)' ;;
                 focus-view) _alternative 'arguments:args:(next previous up down left right)' ;;
+                focus-view-by) _alternative 'arguments:args:(app-id title id)' ;;
+                fetch-view-by) _alternative 'arguments:args:(app-id title id)' ;;
                 input) _riverctl_input ;;
                 move) _alternative 'arguments:args:(up down left right)' ;;
                 resize) _alternative 'arguments:args:(horizontal vertical)' ;;

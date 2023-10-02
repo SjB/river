@@ -39,6 +39,12 @@ over the Wayland protocol.
 	Focus the next or previous view in the stack or the closest view in
 	any direction.
 
+*focus-view-by* *app-id*|*title*|*id*
+	Focus the view selected by the search term
+
+*fetch-view-by* *app-id*|*title*|*id*
+	move the view selected by the search term to the current output and tag
+
 *move* *up*|*down*|*left*|*right* _delta_
 	Move the focused view in the specified direction by _delta_ logical
 	pixels. The view will be set to floating.
@@ -89,6 +95,9 @@ over the Wayland protocol.
 	with the given _namespace_, if any. What commands a layout generator
 	understands depends on the layout generator. For rivertile, see the
 	documentation in the *rivertile*(1) man page.
+
+*list-views*
+	List all view and some information about then in a json format
 
 ## TAG MANAGEMENT
 
