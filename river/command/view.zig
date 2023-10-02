@@ -25,6 +25,11 @@ const View = @import("../View.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
+fn match(s: []const u8, glob: []const u8) bool {
+    globber.validate(glob) catch return std.mem.eql(u8, s, glob);
+    return globber.match(s, glob);
+}
+
 fn viewById(id: []const u8) ?*View {
     var it = server.root.views.iterator(.forward);
     while (it.next()) |view| {
@@ -48,7 +53,7 @@ fn viewByTitle(title: []const u8) ?*View {
         // we should never be searching for a view that doesn't have a title.
         const v_title = std.mem.span(view.getTitle()) orelse continue;
 
-        if (globber.match(v_title, title)) return view;
+        if (match(v_title, title)) return view;
     }
     return null;
 }
@@ -62,7 +67,7 @@ fn viewByAppId(app_id: []const u8) ?*View {
         // we should never be searching for a view that doesn't have a title.
         const v_app_id = std.mem.span(view.getAppId()) orelse continue;
 
-        if (globber.match(v_app_id, app_id)) return view;
+        if (std.mem.eql(u8, v_app_id, app_id)) return view;
     }
     return null;
 }
