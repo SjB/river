@@ -21,12 +21,55 @@ const globber = @import("globber");
 const server = &@import("../main.zig").server;
 const util = @import("../util.zig");
 
+const View = @import("../View.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
-pub fn focusViewByTitle(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
-    if (args.len < 2) return Error.NotEnoughArguments;
-    if (args.len > 2) return Error.TooManyArguments;
+fn viewById(id: []const u8) ?*View {
+    var it = server.root.views.iterator(.forward);
+    while (it.next()) |view| {
+        if (std.mem.eql(u8, id, view.id)) return view;
+    }
+    return null;
+}
+
+const SearchField = enum {
+    @"app-id",
+    title,
+    id,
+};
+
+fn viewByTitle(title: []const u8) ?*View {
+    var it = server.root.views.iterator(.forward);
+    while (it.next()) |view| {
+        // we only want to know about the view that have and output
+        if (view.current.output == null) continue;
+
+        // we should never be searching for a view that doesn't have a title.
+        const v_title = std.mem.span(view.getTitle()) orelse continue;
+
+        if (globber.match(v_title, title)) return view;
+    }
+    return null;
+}
+
+fn viewByAppId(app_id: []const u8) ?*View {
+    var it = server.root.views.iterator(.forward);
+    while (it.next()) |view| {
+        // we only want to know about the view that have and output
+        if (view.current.output == null) continue;
+
+        // we should never be searching for a view that doesn't have a title.
+        const v_app_id = std.mem.span(view.getAppId()) orelse continue;
+
+        if (globber.match(v_app_id, app_id)) return view;
+    }
+    return null;
+}
+
+pub fn focusViewById(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
 
     // If the fallback pseudo-output is focused, there is nowhere to send the view
     if (seat.focused_output == null) {
@@ -34,69 +77,58 @@ pub fn focusViewByTitle(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8
         return;
     }
 
-    if (args[1].len == 0) return;
+    const arg = std.meta.stringToEnum(SearchField, args[1]) orelse return Error.InvalidValue;
+
+    const view = switch (arg) {
+        .@"app-id" => viewByAppId(args[2]),
+        .title => viewByTitle(args[2]),
+        .id => viewById(args[2]),
+    } orelse return Error.InvalidValue;
+
+    var output = view.current.output orelse return;
+
+    if (output.pending.tags != view.pending.tags) {
+        output.previous_tags = output.pending.tags;
+        output.pending.tags = view.pending.tags;
+    }
+
+    if (seat.focused_output == null or seat.focused_output.? != output) {
+        seat.focusOutput(output);
+    }
+    seat.focus(view);
+    server.root.applyPending();
+}
+
+pub fn fetchViewById(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
+    if (args.len < 3) return Error.NotEnoughArguments;
+    if (args.len > 3) return Error.TooManyArguments;
+
+    // If the fallback pseudo-output is focused, there is nowhere to send the view
+    if (seat.focused_output == null) {
+        assert(server.root.active_outputs.empty());
+        return;
+    }
+
+    const arg = std.meta.stringToEnum(SearchField, args[1]) orelse return Error.InvalidValue;
+
+    const view = switch (arg) {
+        .@"app-id" => viewByAppId(args[2]),
+        .title => viewByTitle(args[2]),
+        .id => viewById(args[2]),
+    } orelse return Error.InvalidValue;
 
     const output = seat.focused_output orelse return;
 
-    var it = server.root.views.iterator(.forward);
-
-    while (it.next()) |view| {
-        // we only want to know about the view that have and output
-        if (view.current.output == null) continue;
-
-        // we should never be searching for a view that doesn't have a title.
-        const title = std.mem.span(view.getTitle()) orelse continue;
-
-        if (globber.match(title, args[1])) {
-            const new_tags = view.pending.tags | output.pending.tags;
-            if (new_tags != 0) {
-                view.pending.tags = new_tags;
-            }
-            if (output != view.current.output) {
-                view.setPendingOutput(output);
-            }
-            seat.focus(view);
-            server.root.applyPending();
-            break;
-        }
+    const new_tags = view.pending.tags | output.pending.tags;
+    if (new_tags != 0) {
+        view.pending.tags = new_tags;
     }
-}
 
-pub fn listViewsDump(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!void {
-    var buffer = std.ArrayList(u8).init(util.gpa);
-    const writer = buffer.writer();
-
-    var list = std.ArrayList(struct { appId: []const u8, title: []const u8, output: u8, tags: u32 }).init(util.gpa);
-
-    var it = server.root.views.iterator(.forward);
-    var maxIdSize: usize = 10;
-    var maxTitleSize: usize = 10;
-
-    while (it.next()) |view| {
-        const appId = std.mem.span(view.getAppId()) orelse "";
-        const title = std.mem.span(view.getTitle()) orelse "";
-        const output: u8 = if (view.current.output == null) ' ' else '+';
-        const tags = view.current.tags;
-
-        try list.append(.{ .appId = appId, .title = title, .output = output, .tags = tags });
-        if (appId.len > maxIdSize) maxIdSize = appId.len;
-        if (title.len > maxTitleSize) maxTitleSize = title.len;
+    if (output != view.current.output) {
+        view.setPendingOutput(output);
     }
-    maxIdSize += 1;
-    maxTitleSize += 1;
-
-    try std.fmt.formatBuf("app-id", .{ .width = maxIdSize, .alignment = .left }, writer);
-    try std.fmt.formatBuf("title", .{ .width = maxTitleSize, .alignment = .left }, writer);
-    try std.fmt.formatBuf("tags", .{ .width = 5, .alignment = .left }, writer);
-    try writer.writeAll("output");
-    for (list.items) |el| {
-        try writer.writeByte('\n');
-        try std.fmt.formatBuf(el.appId, .{ .width = maxIdSize, .alignment = .left }, writer);
-        try std.fmt.formatBuf(el.title, .{ .width = maxTitleSize, .alignment = .left }, writer);
-        try writer.print("{d:<5}", .{el.tags});
-        try writer.writeByte(el.output);
-    }
-    out.* = try buffer.toOwnedSlice();
+    seat.focus(view);
+    server.root.applyPending();
 }
 
 pub fn listViews(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!void {
