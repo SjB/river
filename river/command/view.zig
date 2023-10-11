@@ -124,7 +124,7 @@ pub fn fetchViewById(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) E
 
     const output = seat.focused_output orelse return;
 
-    const new_tags = view.pending.tags | output.pending.tags;
+    const new_tags = output.pending.tags;
     if (new_tags != 0) {
         view.pending.tags = new_tags;
     }
