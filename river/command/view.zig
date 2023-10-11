@@ -137,7 +137,17 @@ pub fn fetchViewById(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) E
 }
 
 pub fn listViews(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!void {
-    var list = std.ArrayList(struct { id: []const u8, @"app-id": []const u8, title: []const u8, output: []const u8, tags: u32 }).init(util.gpa);
+    const T = struct {
+        id: []const u8,
+        @"app-id": []const u8,
+        title: []const u8,
+        output: []const u8,
+        tags: u32,
+        float: bool,
+        fullscreen: bool,
+    };
+
+    var list = std.ArrayList(T).init(util.gpa);
 
     var it = server.root.views.iterator(.forward);
     while (it.next()) |view| {
@@ -145,9 +155,18 @@ pub fn listViews(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!voi
         const title = std.mem.span(view.getTitle()) orelse "";
         const appId = std.mem.span(view.getAppId()) orelse "";
 
-        var name = if (view.current.output) |output| std.mem.span(output.wlr_output.name) else "";
+        const name = if (view.current.output) |output| std.mem.span(output.wlr_output.name) else "";
+
         const tags = view.current.tags;
-        try list.append(.{ .id = view.id, .@"app-id" = appId, .title = title, .output = name, .tags = tags });
+        try list.append(.{
+            .id = view.id,
+            .@"app-id" = appId,
+            .title = title,
+            .output = name,
+            .tags = tags,
+            .float = view.current.float,
+            .fullscreen = view.current.fullscreen,
+        });
     }
 
     var buffer = std.ArrayList(u8).init(util.gpa);
