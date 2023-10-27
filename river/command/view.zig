@@ -30,12 +30,12 @@ fn match(s: []const u8, glob: []const u8) bool {
     return globber.match(s, glob);
 }
 
-fn viewById(id: []const u8) ?*View {
+fn viewById(id: []const u8) !?*View {
     var it = server.root.views.iterator(.forward);
     while (it.next()) |view| {
         if (std.mem.eql(u8, id, view.id)) return view;
     }
-    return null;
+    unreachable;
 }
 
 const SearchField = enum {
@@ -44,7 +44,7 @@ const SearchField = enum {
     id,
 };
 
-fn viewByTitle(title: []const u8) ?*View {
+fn viewByTitle(title: []const u8) !?*View {
     var it = server.root.views.iterator(.forward);
     while (it.next()) |view| {
         // we only want to know about the view that have and output
@@ -55,10 +55,10 @@ fn viewByTitle(title: []const u8) ?*View {
 
         if (match(v_title, title)) return view;
     }
-    return null;
+    unreachable;
 }
 
-fn viewByAppId(app_id: []const u8) ?*View {
+fn viewByAppId(app_id: []const u8) !?*View {
     var it = server.root.views.iterator(.forward);
     while (it.next()) |view| {
         // we only want to know about the view that have and output
@@ -69,7 +69,7 @@ fn viewByAppId(app_id: []const u8) ?*View {
 
         if (std.mem.eql(u8, v_app_id, app_id)) return view;
     }
-    return null;
+    unreachable;
 }
 
 pub fn focusViewById(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
@@ -85,9 +85,9 @@ pub fn focusViewById(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) E
     const arg = std.meta.stringToEnum(SearchField, args[1]) orelse return Error.InvalidValue;
 
     const view = switch (arg) {
-        .@"app-id" => viewByAppId(args[2]),
-        .title => viewByTitle(args[2]),
-        .id => viewById(args[2]),
+        .@"app-id" => try viewByAppId(args[2]),
+        .title => try viewByTitle(args[2]),
+        .id => try viewById(args[2]),
     } orelse return Error.InvalidValue;
 
     var output = view.current.output orelse return;
@@ -100,6 +100,7 @@ pub fn focusViewById(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) E
     if (seat.focused_output == null or seat.focused_output.? != output) {
         seat.focusOutput(output);
     }
+
     seat.focus(view);
     server.root.applyPending();
 }
@@ -117,9 +118,9 @@ pub fn fetchViewById(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) E
     const arg = std.meta.stringToEnum(SearchField, args[1]) orelse return Error.InvalidValue;
 
     const view = switch (arg) {
-        .@"app-id" => viewByAppId(args[2]),
-        .title => viewByTitle(args[2]),
-        .id => viewById(args[2]),
+        .@"app-id" => try viewByAppId(args[2]),
+        .title => try viewByTitle(args[2]),
+        .id => try viewById(args[2]),
     } orelse return Error.InvalidValue;
 
     const output = seat.focused_output orelse return;
@@ -132,6 +133,7 @@ pub fn fetchViewById(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) E
     if (output != view.current.output) {
         view.setPendingOutput(output);
     }
+
     seat.focus(view);
     server.root.applyPending();
 }
@@ -146,7 +148,6 @@ pub fn listViews(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!voi
         float: bool,
         fullscreen: bool,
     };
-
     var list = std.ArrayList(T).init(util.gpa);
 
     var it = server.root.views.iterator(.forward);
