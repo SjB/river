@@ -102,24 +102,36 @@ fn handleKey(listener: *wl.Listener(*wlr.Keyboard.event.Key), event: *wlr.Keyboa
         }
     }
 
-    // Handle builtin mapping, only when keys are pressed
     for (keysyms) |sym| {
         if (!released and handleBuiltinMapping(sym)) return;
     }
 
-    // Handle user-defined mappings
-    const mapped = self.device.seat.hasMapping(keycode, modifiers, released, xkb_state);
-    if (mapped) {
+    // If we sent a pressed event to the client we should send the matching release event as well,
+    // even if the release event triggers a mapping or would otherwise be sent to an input method.
+    const sent_to_client = blk: {
+        if (released and !self.eaten_keycodes.remove(event.keycode)) {
+            const wlr_seat = self.device.seat.wlr_seat;
+            wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
+            wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
+            break :blk true;
+        } else {
+            break :blk false;
+        }
+    };
+
+    if (self.device.seat.hasMapping(keycode, modifiers, released, xkb_state)) {
         if (!released) self.eaten_keycodes.add(event.keycode);
 
         const handled = self.device.seat.handleMapping(keycode, modifiers, released, xkb_state);
         assert(handled);
-    }
+    } else if (self.getInputMethodGrab()) |keyboard_grab| {
+        if (!released) self.eaten_keycodes.add(event.keycode);
 
-    const eaten = if (released) self.eaten_keycodes.remove(event.keycode) else mapped;
-
-    if (!eaten) {
-        // If key was not handled, we pass it along to the client.
+        if (!sent_to_client) {
+            keyboard_grab.setKeyboard(keyboard_grab.keyboard);
+            keyboard_grab.sendKey(event.time_msec, event.keycode, event.state);
+        }
+    } else if (!sent_to_client) {
         const wlr_seat = self.device.seat.wlr_seat;
         wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
         wlr_seat.keyboardNotifyKey(event.time_msec, event.keycode, event.state);
@@ -137,8 +149,13 @@ fn handleModifiers(listener: *wl.Listener(*wlr.Keyboard), _: *wlr.Keyboard) void
     // If the keyboard is in a group, this event will be handled by the group's Keyboard instance.
     if (wlr_keyboard.group != null) return;
 
-    self.device.seat.wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
-    self.device.seat.wlr_seat.keyboardNotifyModifiers(&wlr_keyboard.modifiers);
+    if (self.getInputMethodGrab()) |keyboard_grab| {
+        keyboard_grab.setKeyboard(keyboard_grab.keyboard);
+        keyboard_grab.sendModifiers(&wlr_keyboard.modifiers);
+    } else {
+        self.device.seat.wlr_seat.setKeyboard(self.device.wlr_device.toKeyboard());
+        self.device.seat.wlr_seat.keyboardNotifyModifiers(&wlr_keyboard.modifiers);
+    }
 }
 
 /// Handle any builtin, harcoded compsitor mappings such as VT switching.
@@ -147,16 +164,31 @@ fn handleBuiltinMapping(keysym: xkb.Keysym) bool {
     switch (@intFromEnum(keysym)) {
         xkb.Keysym.XF86Switch_VT_1...xkb.Keysym.XF86Switch_VT_12 => {
             log.debug("switch VT keysym received", .{});
-            if (server.backend.isMulti()) {
-                if (server.backend.getSession()) |session| {
-                    const vt = @intFromEnum(keysym) - xkb.Keysym.XF86Switch_VT_1 + 1;
-                    const log_server = std.log.scoped(.server);
-                    log_server.info("switching to VT {}", .{vt});
-                    session.changeVt(vt) catch log_server.err("changing VT failed", .{});
-                }
+            if (server.session) |session| {
+                const vt = @intFromEnum(keysym) - xkb.Keysym.XF86Switch_VT_1 + 1;
+                const log_server = std.log.scoped(.server);
+                log_server.info("switching to VT {}", .{vt});
+                session.changeVt(vt) catch log_server.err("changing VT failed", .{});
             }
             return true;
         },
         else => return false,
     }
+}
+
+/// Returns null if the keyboard is not grabbed by an input method,
+/// or if event is from a virtual keyboard of the same client as the grab.
+/// TODO: see https://gitlab.freedesktop.org/wlroots/wlroots/-/issues/2322
+fn getInputMethodGrab(self: Self) ?*wlr.InputMethodV2.KeyboardGrab {
+    if (self.device.seat.relay.input_method) |input_method| {
+        if (input_method.keyboard_grab) |keyboard_grab| {
+            if (self.device.wlr_device.getVirtualKeyboard()) |virtual_keyboard| {
+                if (virtual_keyboard.resource.getClient() == keyboard_grab.resource.getClient()) {
+                    return null;
+                }
+            }
+            return keyboard_grab;
+        }
+    }
+    return null;
 }
