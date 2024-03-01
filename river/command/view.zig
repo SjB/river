@@ -153,16 +153,17 @@ pub fn listViews(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!voi
     var it = server.root.views.iterator(.forward);
     while (it.next()) |view| {
         // we only want to know about the view that have and output
-        const title = std.mem.span(view.getTitle()) orelse "";
-        const appId = std.mem.span(view.getAppId()) orelse "";
         if (view.destroying) continue;
 
-        const name = if (view.current.output) |output| std.mem.span(output.wlr_output.name) else "";
+        const app_id = std.mem.sliceTo(view.getAppId(), 0) orelse "";
+        const title = std.mem.sliceTo(view.getTitle(), 0) orelse "";
+
+        const name = if (view.current.output) |output| std.mem.sliceTo(output.wlr_output.name, 0) else "";
 
         const tags = view.current.tags;
         try list.append(.{
             .id = view.id,
-            .@"app-id" = appId,
+            .@"app-id" = app_id,
             .title = title,
             .output = name,
             .tags = tags,
