@@ -155,6 +155,7 @@ pub fn listViews(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!voi
         // we only want to know about the view that have and output
         const title = std.mem.span(view.getTitle()) orelse "";
         const appId = std.mem.span(view.getAppId()) orelse "";
+        if (view.destroying) continue;
 
         const name = if (view.current.output) |output| std.mem.span(output.wlr_output.name) else "";
 
