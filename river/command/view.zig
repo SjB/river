@@ -25,24 +25,26 @@ const View = @import("../View.zig");
 const Error = @import("../command.zig").Error;
 const Seat = @import("../Seat.zig");
 
+const SearchField = enum {
+    @"app-id",
+    title,
+    id,
+};
+
 fn match(s: []const u8, glob: []const u8) bool {
     globber.validate(glob) catch return std.mem.eql(u8, s, glob);
     return globber.match(s, glob);
 }
 
 fn viewById(id: []const u8) !?*View {
+    if (id.len == 0) return Error.InvalidValue;
+
     var it = server.root.views.iterator(.forward);
     while (it.next()) |view| {
         if (std.mem.eql(u8, id, view.id)) return view;
     }
-    unreachable;
+    return Error.InvalidValue;
 }
-
-const SearchField = enum {
-    @"app-id",
-    title,
-    id,
-};
 
 fn viewByTitle(title: []const u8) !?*View {
     var it = server.root.views.iterator(.forward);
@@ -51,11 +53,11 @@ fn viewByTitle(title: []const u8) !?*View {
         if (view.current.output == null) continue;
 
         // we should never be searching for a view that doesn't have a title.
-        const v_title = std.mem.span(view.getTitle()) orelse continue;
+        const v_title = std.mem.sliceTo(view.getTitle(), 0) orelse continue;
 
         if (match(v_title, title)) return view;
     }
-    unreachable;
+    return Error.InvalidValue;
 }
 
 fn viewByAppId(app_id: []const u8) !?*View {
@@ -65,11 +67,11 @@ fn viewByAppId(app_id: []const u8) !?*View {
         if (view.current.output == null) continue;
 
         // we should never be searching for a view that doesn't have a title.
-        const v_app_id = std.mem.span(view.getAppId()) orelse continue;
+        const v_app_id = std.mem.sliceTo(view.getAppId(), 0) orelse continue;
 
         if (std.mem.eql(u8, v_app_id, app_id)) return view;
     }
-    unreachable;
+    return Error.InvalidValue;
 }
 
 pub fn focusViewById(seat: *Seat, args: []const [:0]const u8, _: *?[]const u8) Error!void {
@@ -155,10 +157,10 @@ pub fn listViews(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!voi
         // we only want to know about the view that have and output
         if (view.destroying) continue;
 
-        const app_id = std.mem.sliceTo(view.getAppId(), 0) orelse "";
-        const title = std.mem.sliceTo(view.getTitle(), 0) orelse "";
+        const app_id = std.mem.sliceTo(view.getAppId(), 0) orelse continue;
+        const title = std.mem.sliceTo(view.getTitle(), 0) orelse continue;
 
-        const name = if (view.current.output) |output| std.mem.sliceTo(output.wlr_output.name, 0) else "";
+        const name = if (view.current.output) |output| std.mem.sliceTo(output.wlr_output.name, 0) else continue;
 
         const tags = view.current.tags;
         try list.append(.{
