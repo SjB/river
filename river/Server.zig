@@ -118,7 +118,6 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     // Seed RNG.
     var now: os.timespec = undefined;
     os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported!");
-    self.rng = rand.DefaultPrng.init(@intCast(now.tv_nsec));
 
     const wl_server = try wl.Server.create();
 
@@ -130,6 +129,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
 
     const loop = wl_server.getEventLoop();
     server.* = .{
+        .rng = rand.DefaultPrng.init(@intCast(now.tv_nsec)),
+
         .wl_server = wl_server,
         .sigint_source = try loop.addSignal(*wl.Server, std.os.SIG.INT, terminate, wl_server),
         .sigterm_source = try loop.addSignal(*wl.Server, std.os.SIG.TERM, terminate, wl_server),
@@ -477,8 +478,8 @@ fn handleRequestSetCursorShape(
     }
 }
 
-pub fn getUniqueId(self: *Self) ![:0]const u8 {
-    const random = self.rng.random();
+pub fn getUniqueId(server: *Server) ![:0]const u8 {
+    const random = server.rng.random();
     var buf: [16]u8 = undefined;
     for (&buf) |*chr| {
         // Random character from ASCII lower case block.
