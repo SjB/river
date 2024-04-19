@@ -18,6 +18,8 @@ const Server = @This();
 
 const build_options = @import("build_options");
 const std = @import("std");
+const rand = std.rand;
+const os = std.os;
 const assert = std.debug.assert;
 const posix = std.posix;
 const wlr = @import("wlroots");
@@ -47,6 +49,8 @@ const XwaylandView = @import("XwaylandView.zig");
 const log = std.log.scoped(.server);
 
 wl_server: *wl.Server,
+
+rng: rand.DefaultPrng,
 
 sigint_source: *wl.EventSource,
 sigterm_source: *wl.EventSource,
@@ -117,6 +121,10 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     // since river will exit during initialization anyway if there is an error.
     // This keeps the code simpler and more readable.
 
+    // Seed RNG.
+    var now: os.timespec = undefined;
+    os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported!");
+
     const wl_server = try wl.Server.create();
     const loop = wl_server.getEventLoop();
 
@@ -127,6 +135,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     const compositor = try wlr.Compositor.create(wl_server, 6, renderer);
 
     server.* = .{
+        .rng = rand.DefaultPrng.init(@intCast(now.tv_nsec)),
+
         .wl_server = wl_server,
         .sigint_source = try loop.addSignal(*wl.Server, posix.SIG.INT, terminate, wl_server),
         .sigterm_source = try loop.addSignal(*wl.Server, posix.SIG.TERM, terminate, wl_server),
@@ -513,4 +523,14 @@ fn handleRequestSetCursorShape(
             seat.cursor.setXcursor(name);
         }
     }
+}
+
+pub fn getUniqueId(server: *Server) ![:0]const u8 {
+    const random = server.rng.random();
+    var buf: [16]u8 = undefined;
+    for (&buf) |*chr| {
+        // Random character from ASCII lower case block.
+        chr.* = 97 + random.uintLessThan(u8, 26);
+    }
+    return try util.gpa.dupeZ(u8, &buf);
 }

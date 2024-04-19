@@ -181,6 +181,9 @@ post_fullscreen_box: wlr.Box = undefined,
 
 foreign_toplevel_handle: ForeignToplevelHandle = .{},
 
+/// Unique identifier.
+id: [:0]const u8,
+
 /// Connector name of the output this view occupied before an evacuation.
 output_before_evac: ?[]const u8 = null,
 
@@ -192,6 +195,9 @@ pub fn create(impl: Impl) error{OutOfMemory}!*View {
     const view = try util.gpa.create(View);
     errdefer util.gpa.destroy(view);
 
+    const id = try server.getUniqueId();
+    errdefer util.gpa.free(id);
+
     const tree = try server.root.hidden.tree.createSceneTree();
     errdefer tree.node.destroy();
 
@@ -202,6 +208,7 @@ pub fn create(impl: Impl) error{OutOfMemory}!*View {
         .impl = impl,
         .link = undefined,
         .tree = tree,
+        .id = id,
         .surface_tree = try tree.createSceneTree(),
         .saved_surface_tree = try tree.createSceneTree(),
         .borders = .{
