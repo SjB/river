@@ -19,7 +19,6 @@ const Server = @This();
 const build_options = @import("build_options");
 const std = @import("std");
 const rand = std.rand;
-const os = std.os;
 const assert = std.debug.assert;
 const posix = std.posix;
 const wlr = @import("wlroots");
@@ -122,8 +121,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
     // This keeps the code simpler and more readable.
 
     // Seed RNG.
-    var now: os.timespec = undefined;
-    os.clock_gettime(os.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported!");
+    var now: posix.timespec = undefined;
+    posix.clock_gettime(posix.CLOCK.MONOTONIC, &now) catch @panic("CLOCK_MONOTONIC not supported!");
 
     const wl_server = try wl.Server.create();
     const loop = wl_server.getEventLoop();

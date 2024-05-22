@@ -175,7 +175,7 @@ pub fn listViews(_: *Seat, _: []const [:0]const u8, out: *?[]const u8) Error!voi
     }
 
     var buffer = std.ArrayList(u8).init(util.gpa);
-    var arr = try list.toOwnedSlice();
+    const arr = try list.toOwnedSlice();
     try std.json.stringify(arr, .{}, buffer.writer());
     out.* = try buffer.toOwnedSlice();
 }
